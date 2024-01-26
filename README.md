@@ -51,7 +51,7 @@ The canister is a very basic implementation of the standard, we are going to dep
 
 ## Deployment
 
-To deploy the canister, run the following command:
+To deploy the canister, run the following command. We are going to deploy a sample Membership NFT:
 
 ```bash
 dfx deploy --argument 'record { name="Membership"; symbol="MMBR"; custodians=null; logo=null;  }' dip721_nft_container
