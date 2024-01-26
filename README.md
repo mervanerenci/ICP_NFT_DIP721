@@ -1,19 +1,8 @@
-# DIP721 NFT container
+# Deploying and Interacting with the DIP721 NFT Container on the Internet Computer
 
-This example demonstrates implementing an NFT canister. NFTs (non-fungible tokens) are unique tokens with arbitrary
-metadata, usually an image of some kind, to form the digital equivalent of trading cards. There are a few different
-NFT standards for the Internet Computer (e.g [EXT](https://github.com/Toniq-Labs/extendable-token), [IC-NFT](https://github.com/rocklabs-io/ic-nft)), but for the purposes of this tutorial we use [DIP-721](https://github.com/Psychedelic/DIP721). You can see a quick introduction on [YouTube](https://youtu.be/1po3udDADp4).
+This example demonstrates implementing an NFT canister. 
+The canister is a very basic implementation of the standard, we are going to deploy NFT canister and mint Membership NFTs for example usage. 
 
-The canister is a basic implementation of the standard, with support for the minting, burning, and notification interface extensions.
-
-## Overview
-
-The NFT canister is not very complicated since the [DIP-721](https://github.com/Psychedelic/DIP721) standard specifies most [CRUD](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete) operations,
-but we can still use it to explain three important concepts concerning dapp development for the Internet Computer:
-
-A running instance of the Rust canister for demonstration purposes is available as [t5l7c-7yaaa-aaaab-qaehq-cai](https://t5l7c-7yaaa-aaaab-qaehq-cai.icp0.io).
-The interface is meant to be programmatic, but the Rust version additionally contains HTTP functionality so you can view a metadata file at `<canister URL>/<NFT ID>/<file ID>`.
-It contains six NFTs, so you can look at items from `<canister URL>/0/0` to `<canister URL>/5/0`.
 
 ### Prerequisites
 
@@ -32,7 +21,7 @@ It contains six NFTs, so you can look at items from `<canister URL>/0/0` to `<ca
 #### NFT Management
 
 -   **`mint(to: Principal, metadata: MetadataDesc, blob_content: Vec<u8>)`**: Mints a new NFT.
--   **`burn(token_id: u64)`**: Burns (destroys) an NFT.
+
 
 #### NFT Transfer
 
@@ -59,6 +48,7 @@ It contains six NFTs, so you can look at items from `<canister URL>/0/0` to `<ca
 -   **`supported_interfaces()`**: Lists the supported interfaces (DIP721 standards).
 -   **`get_metadata(token_id: u64)`**: Retrieves metadata for a specific NFT.
 -   **`get_metadata_for_user(user: Principal)`**: Retrieves metadata for all NFTs owned by a user.
+-   **`is_principal_member(user: Principal)**: Returns if user is a member (this is for example implementation).
 
 #### Customization Functions
 
@@ -66,29 +56,86 @@ It contains six NFTs, so you can look at items from `<canister URL>/0/0` to `<ca
 -   **`set_symbol(sym: String)`**: Sets the symbol of the NFT collection.
 -   **`set_logo(logo: Option<LogoResult>)`**: Sets the logo for the NFT collection.
 
-### ICP-Example Repo
 
-The sample code is available in the [samples repository](https://github.com/dfinity/examples) in [Rust](https://github.com/dfinity/examples/tree/master/rust/dip721-nft-container)
+## Deployment
 
-#### Demo
+To deploy the canister, run the following command:
 
-This Rust example comes with a demo script, `demo.sh`, which runs through an example workflow with minting and trading an NFT between a few users. This is primarily designed to be read rather than run so that you can use it to see how basic NFT operations are done. For a more in-depth explanation, read the [standard][DIP721].
-
-### 1 - Open Terminal
-
-First, open the Terminal application on your Mac. You can find it in the Applications folder under Utilities, or you can search for it using Spotlight.
-
-### 2- Make the Script Executable
-
-Before running the script, you need to make sure it is executable. You can do this by running the following command:
-
-```sh
-chmod +x demo.sh
+```bash
+dfx deploy --argument 'record { name="Membership"; symbol="MMBR"; custodians=null; logo=null;  }' dip721_nft_container
 ```
 
-### 3- Run the Script
-Now, you can run the script by typing:
+## Minting Tokens
 
-```sh
-./demo.sh
+To mint a new token, run the following command:
+
+```bash
+dfx canister call dip721_nft_container mintDip721 \
+"(principal\"$YOU\",vec{record{
+    purpose=variant{Rendered};
+    data=blob\"hello\";
+    key_val_data=vec{
+        record{
+            \"MembershipType\";
+            variant{TextContent=\"Gold"}; 
+        };
+    }
+}},blob\"hello\")"
 ```
+
+Replace `$YOU` with your principal. This will mint a new token with a "Gold" membership type.
+
+You should see the following output:
+
+```bash
+(variant { Ok = record { id = 0 : nat; token_id = 0 : nat64 } })
+```
+
+To get your principal id, run the folllowing command:
+```bash
+dfx identity get-principal
+```
+
+## Retrieving Metadata
+
+To retrieve the metadata for a token, run the following command:
+
+```bash
+dfx canister call dip721_nft_container getMetadata "(0: nat64)"
+```
+
+Example output:
+
+```bash
+(
+  variant {
+    Ok = vec {
+      record {
+        data = blob "hello";
+        key_val_data = vec {
+          record { "MembershipType"; variant { TextContent = "Gold" } };
+        };
+        purpose = variant { Rendered };
+      };
+    }
+  },
+)
+```
+
+## Checking Membership
+
+To check if a principal is a member, run the following command:
+
+```bash
+dfx canister call dip721_nft_container isPrincipalMember "(principal\"c34g5-fdzyx-hoqia-mrhsl-krips-3asow-bjuqe-rtpy7-ene2q-atrbo-kae\")"
+```
+
+Replace the principal with the one you want to check. This will return `true` if the principal is a member, and `false` otherwise.
+
+## Candid UI
+
+You can also use the [Candid UI](https://sdk.dfinity.org/docs/candid-guide/candid-ui.html) to interact with the canister.
+
+![image](https://github.com/mervanerenci/ICP_NFT_DIP721/assets/101268022/1c610548-c82d-4796-b102-ca76db872d77)
+
+
