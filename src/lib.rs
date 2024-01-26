@@ -105,11 +105,6 @@ fn transfer_from(from: Principal, to: Principal, token_id: u64) -> Result {
         let caller = api::caller();
         if nft.owner != caller
             && nft.approved != Some(caller)
-            && !state
-                .operators
-                .get(&from)
-                .map(|s| s.contains(&caller))
-                .unwrap_or(false)
             && !state.custodians.contains(&caller)
         {
             Err(Error::Unauthorized)
@@ -209,125 +204,22 @@ fn get_metadata_for_user(/* user: Principal */) /* -> Vec<ExtendedMetadataResult
     });
 }
 
-// ----------------------
-// notification interface
-// ----------------------
-
-#[update(name = "transferFromNotifyDip721")]
-fn transfer_from_notify(from: Principal, to: Principal, token_id: u64, data: Vec<u8>) -> Result {
-    let res = transfer_from(from, to, token_id)?;
-    if let Ok(arg) = Encode!(&api::caller(), &from, &token_id, &data) {
-        // Using call_raw ensures we don't need to await the future for the call to be executed.
-        // Calling an arbitrary function like this means that a malicious recipient could call
-        // transferFromNotifyDip721 in their onDIP721Received function, resulting in an infinite loop.
-        // This will trap eventually, but the transfer will have already been completed and the state-change persisted.
-        // That means the original transfer must reply before that happens, or the caller will be
-        // convinced that the transfer failed when it actually succeeded. So we don't await the call,
-        // so that we'll reply immediately regardless of how long the notification call takes.
-        let _ = api::call::call_raw(to, "onDIP721Received", arg, 0);
-    }
-    Ok(res)
-}
-
-#[update(name = "safeTransferFromNotifyDip721")]
-fn safe_transfer_from_notify(
-    from: Principal,
-    to: Principal,
-    token_id: u64,
-    data: Vec<u8>,
-) -> Result {
-    if to == MGMT {
-        Err(Error::ZeroAddress)
-    } else {
-        transfer_from_notify(from, to, token_id, data)
-    }
-}
-
-// ------------------
-// approval interface
-// ------------------
-
-#[update(name = "approveDip721")]
-fn approve(user: Principal, token_id: u64) -> Result {
+#[export_name = "canister_update isPrincipalMember"]
+fn is_principal_member(
+    /*user: Principal*/
+) /*-> bool */{
+    let user = call::arg_data::<(Principal,)>().0;
     STATE.with(|state| {
-        let mut state = state.borrow_mut();
-        let state = &mut *state;
-        let caller = api::caller();
-        let nft = state
+        let state = state.borrow();
+        let is_member = state
             .nfts
-            .get_mut(usize::try_from(token_id)?)
-            .ok_or(Error::InvalidTokenId)?;
-        if nft.owner != caller
-            && nft.approved != Some(caller)
-            && !state
-                .operators
-                .get(&user)
-                .map(|s| s.contains(&caller))
-                .unwrap_or(false)
-            && !state.custodians.contains(&caller)
-        {
-            Err(Error::Unauthorized)
-        } else {
-            nft.approved = Some(user);
-            Ok(state.next_txid())
-        }
-    })
+            .iter()
+            .any(|n| n.owner == user);
+        call::reply((is_member,));
+    });
+
 }
 
-#[update(name = "setApprovalForAllDip721")]
-fn set_approval_for_all(operator: Principal, is_approved: bool) -> Result {
-    STATE.with(|state| {
-        let mut state = state.borrow_mut();
-        let caller = api::caller();
-        if operator != caller {
-            let operators = state.operators.entry(caller).or_default();
-            if operator == MGMT {
-                if !is_approved {
-                    operators.clear();
-                } else {
-                    // cannot enable everyone as an operator
-                }
-            } else {
-                if is_approved {
-                    operators.insert(operator);
-                } else {
-                    operators.remove(&operator);
-                }
-            }
-        }
-        Ok(state.next_txid())
-    })
-}
-
-// #[query(name = "getApprovedDip721")] // Psychedelic/DIP721#5
-fn _get_approved(token_id: u64) -> Result<Principal> {
-    STATE.with(|state| {
-        let approved = state
-            .borrow()
-            .nfts
-            .get(usize::try_from(token_id)?)
-            .ok_or(Error::InvalidTokenId)?
-            .approved
-            .unwrap_or_else(api::caller);
-        Ok(approved)
-    })
-}
-
-#[query(name = "isApprovedForAllDip721")]
-fn is_approved_for_all(operator: Principal) -> bool {
-    STATE.with(|state| {
-        state
-            .borrow()
-            .operators
-            .get(&api::caller())
-            .map(|s| s.contains(&operator))
-            .unwrap_or(false)
-    })
-}
-
-// --------------
-// mint interface
-// --------------
 
 #[update(name = "mintDip721")]
 fn mint(
@@ -418,24 +310,51 @@ fn set_logo(logo: Option<LogoResult>) -> Result<()> {
     })
 }
 
-#[update]
-fn set_custodian(user: Principal, custodian: bool) -> Result<()> {
-    STATE.with(|state| {
-        let mut state = state.borrow_mut();
-        if state.custodians.contains(&api::caller()) {
-            if custodian {
-                state.custodians.insert(user);
-            } else {
-                state.custodians.remove(&user);
-            }
-            Ok(())
-        } else {
-            Err(Error::Unauthorized)
-        }
-    })
-}
+/* 
 
-#[query]
-fn is_custodian(principal: Principal) -> bool {
-    STATE.with(|state| state.borrow().custodians.contains(&principal))
-}
+Deploy by running following command:
+
+dfx deploy --argument 'record { name="Membership"; symbol="MMBR"; custodians=null; logo=null;  }' dip721_nft_container
+
+Lets mint a sample gold membership token by running following command:
+
+dfx canister call dip721_nft_container mintDip721 \
+"(principal\"$YOU\",vec{record{
+    purpose=variant{Rendered};
+    data=blob\"hello\";
+    key_val_data=vec{
+        record{
+            \"MembershipType\";
+            variant{TextContent=\"Gold"}; 
+        };
+    }
+}},blob\"hello\")"     
+
+You should see this output:
+ 
+(variant { Ok = record { id = 0 : nat; token_id = 0 : nat64 } })
+
+is_this_principal_a_member can be called to check if a principal is a member or not.
+
+dfx canister call dip721_nft_container isPrincipalMember "(principal\"c34g5-fdzyx-hoqia-mrhsl-krips-3asow-bjuqe-rtpy7-ene2q-atrbo-kae\")"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+c34g5-fdzyx-hoqia-mrhsl-krips-3asow-bjuqe-rtpy7-ene2q-atrbo-kae
+
+*/

@@ -23,7 +23,6 @@ pub struct StableState {
 pub struct State {
     pub nfts: Vec<Nft>,
     pub custodians: HashSet<Principal>,
-    pub operators: HashMap<Principal, HashSet<Principal>>, // owner to operators
     pub logo: Option<LogoResult>,
     pub name: String,
     pub symbol: String,
