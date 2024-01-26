@@ -30,14 +30,6 @@ The canister is a very basic implementation of the standard, we are going to dep
 -   **`transfer_from_notify(from: Principal, to: Principal, token_id: u64, data: Vec<u8>)`**: Transfers an NFT and notifies the recipient.
 -   **`safe_transfer_from_notify(from: Principal, to: Principal, token_id: u64, data: Vec<u8>)`**: Safely transfers an NFT with notification.
 
-#### Approval and Access Control
-
--   **`approve(user: Principal, token_id: u64)`**: Approves a user to manage a specific NFT.
--   **`set_approval_for_all(operator: Principal, is_approved: bool)`**: Sets or unsets approval for an operator to manage all NFTs of the caller.
--   **`is_approved_for_all(operator: Principal)`**: Checks if an operator is approved for all NFTs of the caller.
--   **`set_custodian(user: Principal, custodian: bool)`**: Adds or removes a custodian.
--   **`is_custodian(principal: Principal)`**: Checks if a principal is a custodian.
-
 #### Query Functions
 
 -   **`balance_of(user: Principal)`**: Returns the number of NFTs owned by a user.
@@ -48,7 +40,7 @@ The canister is a very basic implementation of the standard, we are going to dep
 -   **`supported_interfaces()`**: Lists the supported interfaces (DIP721 standards).
 -   **`get_metadata(token_id: u64)`**: Retrieves metadata for a specific NFT.
 -   **`get_metadata_for_user(user: Principal)`**: Retrieves metadata for all NFTs owned by a user.
--   **`is_principal_member(user: Principal)**: Returns if user is a member (this is for example implementation).
+-   **`is_principal_member(user: Principal)`**: Returns if user is a member (this is for example implementation).
 
 #### Customization Functions
 
